@@ -1,7 +1,9 @@
-from config import Pytse_stock_data,finpy_stock_data
+from config import Pytse_stock_data,finpy_stock_data, macroeconomy_data,PROCESSED_DIR, stock_list
 from src.stock_list.get_stock_list import get_stock_list
 from src.extraction.finpy_tse.finpy_tse_Extraction import finpy_tse_Extraction
 from src.extraction.pytse_client.pytse_Client_Extraction import pytse_Client_Extraction
+from src.extraction.macroEconomy.macroEconomy_Extraction import get_macroeconomy_data
+from src.calculations.all_Assets_Prices import arrange_Assets_Prices
 
 from datetime import date
 
@@ -9,11 +11,8 @@ from datetime import date
 #from src.inputs import CAPMInputs
 #from src.capm import compute_returns
 
-def run_pipeline():
-
-    #print(type(get_stock_list))
-    stocks = get_stock_list()
-
+def run_pipeline():    
+    
     Extraction_choice = select_from_menu(
         "Do you want to extract the data now?",
         ["Yes","No"]
@@ -30,52 +29,25 @@ def run_pipeline():
     )
 
     if Extraction_choice == 0:
+
+        get_macroeconomy_data(macroeconomy_data)
+        stocks = get_stock_list(stock_list)
+
         if ds_choice == 0:
-            data_source = "Pytse Client Library"
+            data_source = Pytse_stock_data
             pytse_Client_Extraction(stocks.tolist() , Pytse_stock_data)
         else: 
-            data_source = "Finpy TSE Library"
+            data_source = finpy_stock_data
             finpy_tse_Extraction(stocks , finpy_stock_data)
     else: 
+
          if ds_choice == 0:
-            data_source = "Pytse Client Library"
+            data_source = Pytse_stock_data
          else: 
-            data_source = "Finpy TSE Library"
+            data_source = finpy_stock_data
 
     # ==============================
-    # Q2: Analysis Period
-    # ==============================
-
-    period_options = [f"{i * 0.5} Years" for i in range(1, 21)]
-    period_index = select_from_menu(
-        "Select analysis period",
-        period_options
-    )
-
-    analysis_years = (period_index + 1) * 0.5
-
-
-    # ==============================
-    # Q3: Frequency
-    # ==============================
-
-    frequencies = ["Daily", "Weekly", "Monthly"]
-    freq_index = select_from_menu(
-        "Select analysis frequency",
-        frequencies
-    )
-
-    frequency_map = {
-        0: "D",
-        1: "W",
-        2: "M"
-    }
-
-    frequency = frequency_map[freq_index]
-
-
-    # ==============================
-    # Q4: Start Date (Guided)
+    # Q2: Start Date (Guided)
     # ==============================
 
     print("\nSelect analysis start date")
@@ -92,6 +64,43 @@ def run_pipeline():
             print("❌ Invalid date combination. Please re-enter.")
             day = select_integer("Day", 1, 31)
 
+    # ==============================
+    # Q3: end Date (Guided)
+    # ==============================
+
+    print("\nSelect analysis end date")
+
+    year = select_integer("Year", 1990, date.today().year)
+    month = select_integer("Month", 1, 12)
+    day = select_integer("Day", 1, 31)
+
+    while True:
+        try:
+            end_date = date(year, month, day)
+            break
+        except ValueError:
+            print("❌ Invalid date combination. Please re-enter.")
+            day = select_integer("Day", 1, 31)
+
+
+
+    # ==============================
+    # Q4: Frequency
+    # ==============================
+
+    frequencies = ["Daily", "Weekly", "Monthly"]
+    freq_index = select_from_menu(
+        "Select analysis frequency",
+        frequencies
+    )
+
+    frequency_map = {
+        0: "D",
+        1: "W",
+        2: "M"
+    }
+
+    frequency = frequency_map[freq_index]
 
     # ==============================
     # Q5: USD Base
@@ -113,16 +122,20 @@ def run_pipeline():
 
 
     # ==============================
-    # Final Summary
+    # Summary
     # ==============================
 
     print("\n✅ Configuration Locked In")
     print("=" * 30)
     print(f"Data Source      : {data_source}")
-    print(f"Period (Years) : {analysis_years}")
-    print(f"Frequency Code : {frequency}")
     print(f"Start Date     : {start_date}")
-    print(f"USD Base     : {USD_Base}")     
+    print(f"end Date     : {end_date}")
+    print(f"Frequency Code : {frequency}")
+    print(f"USD Base     : {USD_Base}")
+
+    arrange_Assets_Prices(stock_list ,data_source, start_date, end_date, frequency, USD_Base, PROCESSED_DIR)
+
+
 
     '''
     fetch_and_save_prices(stocks, RAW_DIR / "stock_prices")
@@ -143,7 +156,7 @@ def run_pipeline():
 
     '''
 
- # ==============================
+# ==============================
 # Core Selection Utilities
 # ==============================
 

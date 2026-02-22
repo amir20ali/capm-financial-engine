@@ -1,5 +1,4 @@
 import finpy_tse as fpy
-from pathlib import Path
 
 def finpy_tse_Extraction(stocks, save_path):
 

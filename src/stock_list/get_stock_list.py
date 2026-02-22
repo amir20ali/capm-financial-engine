@@ -1,9 +1,7 @@
 import finpy_tse as fpy
-from pathlib import Path
+import pandas as pd
 
-path = str(Path.cwd())
-
-def get_stock_list():
+def get_stock_list(path):
 
     DF1 = fpy.Build_Market_StockList(bourse=True,
                                     farabourse=False,
@@ -16,4 +14,7 @@ def get_stock_list():
 
     Tickers = DF1.index
 
+    pd.Series(Tickers, name="ticker").to_csv(path / "stock_list.csv", index=False, header=False, encoding="utf-8-sig")
+
     return Tickers
+
