@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 
-def risk_return_analysis(all_Asset_Returns, risk_free_rate, PROCESSED_DIR):
+def risk_return_analysis(all_Asset_Returns, risk_free_stock, PROCESSED_DIR):
 
     df = all_Asset_Returns.copy()
 
@@ -16,6 +16,11 @@ def risk_return_analysis(all_Asset_Returns, risk_free_rate, PROCESSED_DIR):
     # ---- بازده کل دوره ----
     total_return = (1 + returns).prod() - 1
 
+    if risk_free_stock in total_return.index:
+        risk_free_rate = total_return.loc[risk_free_stock]
+    else:
+        raise KeyError(f"'{risk_free_stock}' not found in total_return.index")
+    
     # Calculate excess returns
     excess_returns = total_return.subtract(risk_free_rate)
 
@@ -27,26 +32,26 @@ def risk_return_analysis(all_Asset_Returns, risk_free_rate, PROCESSED_DIR):
     total_vol = volatility * (counts ** 0.5)
 
     # ساخت DataFrame نهایی
-    # محافظت در برابر تقسیم بر صفر هنگام محاسبه Sharp Ratio
-    sharp_ratio = excess_returns / total_vol.replace(0, pd.NA)
+    # محافظت در برابر تقسیم بر صفر هنگام محاسبه Sharpe Ratio
+    sharpe_ratio = excess_returns / total_vol.replace(0, pd.NA)
 
     result = pd.DataFrame({
         "Return": total_return,
         "Risk": total_vol,
-        "Sharp Ratio": sharp_ratio,
+        "Sharpe Ratio": sharpe_ratio,
         "Counts": counts
     })
 
-    # Sort output by Sharp Ratio descending
-    result = result.sort_values("Sharp Ratio", ascending=False)
+    # Sort output by Sharpe Ratio descending
+    result = result.sort_values("Sharpe Ratio", ascending=False)
 
     # ---- رسم نمودار ----
     plot_risk_return(result)
 
-    # خروجی مرتب شده روی Sharp Ratio
+    # خروجی مرتب شده روی Sharpe Ratio
 
     result.to_excel(
-        PROCESSED_DIR / 'Risk, Return and Sharp Ratio.xlsx',
+        PROCESSED_DIR / 'Risk, Return and Sharpe Ratio.xlsx',
         index=True,
         float_format='%.5f'
     )
@@ -70,9 +75,9 @@ def plot_risk_return(result):
         textposition="top center",
         marker=dict(
             size=14,
-            color=result["Sharp Ratio"],   # رنگ بر اساس Sharp Ratio
+            color=result["Sharpe Ratio"],   # رنگ بر اساس Sharpe Ratio
             colorscale="RdYlGn",            # سبز خوب، قرمز بد
-            colorbar=dict(title="Sharp Ratio"),
+            colorbar=dict(title="Sharpe Ratio"),
             showscale=True,
             line=dict(width=1, color='black')
         )

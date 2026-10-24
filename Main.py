@@ -7,7 +7,7 @@ from src.calculations.all_Assets_Prices import arrange_Assets_Prices
 from src.calculations.calculate_Returns import calculate_Returns
 from src.calculations.investment_Result import investment_Result
 from src.calculations.risk_return_analysis import risk_return_analysis
-from src.calculations.efficient_forntier_calculation import efficient_frontier
+from src.calculations.efficient_frontier_calculation import efficient_frontier
 
 from datetime import date
 
@@ -142,9 +142,9 @@ def run_pipeline():
     
     all_Asset_Returns = calculate_Returns(all_Assets_Prices, PROCESSED_DIR)
 
-    risk_free_rate = 0.03/22  # با سهم جایگزین شود
+    risk_free_stock = 'RF'
 
-    risk_return_data = risk_return_analysis(all_Asset_Returns, risk_free_rate, PROCESSED_DIR)
+    risk_return_data = risk_return_analysis(all_Asset_Returns, risk_free_stock, PROCESSED_DIR)
 
 
     #covariance & Correlation matrix calculation and saving
@@ -191,7 +191,7 @@ def run_pipeline():
     #add share
     investment_Result(watchout_Assets, all_Asset_Returns)
 
-    frontier_returns, frontier_risks, fig = efficient_frontier(watchout_Assets, risk_return_data, cov_matrix, PROCESSED_DIR)
+    frontier_returns, frontier_risks, fig = efficient_frontier(watchout_Assets, risk_return_data, risk_free_stock, cov_matrix, PROCESSED_DIR)
 
 
 

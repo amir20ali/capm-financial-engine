@@ -6,7 +6,7 @@ import warnings
 
 #warnings.filterwarnings('ignore')
 
-def efficient_frontier(watchout_Assets, risk_return_data, cov_matrix, PROCESSED_DIR):
+def efficient_frontier(watchout_Assets, risk_return_data, risk_free_stock, cov_matrix, PROCESSED_DIR):
     """
     Calculate the efficient frontier for a portfolio with focus on watchout assets.
     
@@ -28,11 +28,14 @@ def efficient_frontier(watchout_Assets, risk_return_data, cov_matrix, PROCESSED_
     tuple : (frontier_returns, frontier_risks, fig)
         Arrays of returns and risks along the efficient frontier, and the interactive plot figure
     """
+
+
+    risk_free_rate = risk_return_data.loc[risk_free_stock, "Return"]
     
     try:
         
         # Extract expected returns from risk_return_data
-        # risk_return_data has assets as index and columns: Return, Risk, Sharp Ratio, Count
+        # risk_return_data has assets as index and columns: Return, Risk, Sharpe Ratio, Count
         if 'Return' in risk_return_data.columns:
             expected_returns = risk_return_data['Return']
         else:
@@ -218,7 +221,7 @@ def efficient_frontier(watchout_Assets, risk_return_data, cov_matrix, PROCESSED_
         # Create Interactive Plotly Visualization
         
         # Calculate Sharpe ratio for coloring (simplified: return/risk)
-        sharpe_proxy = (frontier_returns -0.4) / (frontier_risks)  #Will be corrected later
+        sharpe_proxy = (frontier_returns - risk_free_rate) / (frontier_risks) 
         
         # Create interactive plotly figure
         fig = go.Figure()
