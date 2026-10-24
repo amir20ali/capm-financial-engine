@@ -1,9 +1,13 @@
-from config import Pytse_stock_data,finpy_stock_data, macroeconomy_data,PROCESSED_DIR, stock_list
+from config import Pytse_stock_data,finpy_stock_data, meconomy_path,PROCESSED_DIR, stock_list
 from src.stock_list.get_stock_list import get_stock_list
 from src.extraction.finpy_tse.finpy_tse_Extraction import finpy_tse_Extraction
 from src.extraction.pytse_client.pytse_Client_Extraction import pytse_Client_Extraction
 from src.extraction.macroEconomy.macroEconomy_Extraction import get_macroeconomy_data
 from src.calculations.all_Assets_Prices import arrange_Assets_Prices
+from src.calculations.calculate_Returns import calculate_Returns
+from src.calculations.investment_Result import investment_Result
+from src.calculations.risk_return_analysis import risk_return_analysis
+from src.calculations.efficient_forntier_calculation import efficient_frontier
 
 from datetime import date
 
@@ -30,7 +34,7 @@ def run_pipeline():
 
     if Extraction_choice == 0:
 
-        get_macroeconomy_data(macroeconomy_data)
+        get_macroeconomy_data(meconomy_path)
         stocks = get_stock_list(stock_list)
 
         if ds_choice == 0:
@@ -45,6 +49,9 @@ def run_pipeline():
             data_source = Pytse_stock_data
          else: 
             data_source = finpy_stock_data
+
+    #Reading Macroeconomy List
+    meconomy_List = ["None"] + [file.stem for file in meconomy_path.glob("*.csv")]
 
     # ==============================
     # Q2: Start Date (Guided)
@@ -103,22 +110,17 @@ def run_pipeline():
     frequency = frequency_map[freq_index]
 
     # ==============================
-    # Q5: USD Base
+    # Q5: Base
     # ==============================
 
-    answers = [
-        "Yes",
-        "NO"
-    ]
+    answers = meconomy_List
 
     ds_choice = select_from_menu(
-        "Prcie based on USD?",
+        "Which Macro Economy data should be the base?",
         answers
     )
 
-    if ds_choice == 0:
-        USD_Base = True
-    else: USD_Base = False
+    meconomy_Base = meconomy_List[ds_choice]
 
 
     # ==============================
@@ -131,30 +133,80 @@ def run_pipeline():
     print(f"Start Date     : {start_date}")
     print(f"end Date     : {end_date}")
     print(f"Frequency Code : {frequency}")
-    print(f"USD Base     : {USD_Base}")
+    print(f"Price Base     : {meconomy_Base}")
 
-    arrange_Assets_Prices(stock_list ,data_source, start_date, end_date, frequency, USD_Base, PROCESSED_DIR)
+    all_Assets_Prices = arrange_Assets_Prices(stock_list ,data_source, 
+                                              start_date, end_date, frequency, 
+                                              meconomy_Base, meconomy_path, meconomy_List,
+                                              PROCESSED_DIR)
+    
+    all_Asset_Returns = calculate_Returns(all_Assets_Prices, PROCESSED_DIR)
+
+    risk_free_rate = 0.03/22  # با سهم جایگزین شود
+
+    risk_return_data = risk_return_analysis(all_Asset_Returns, risk_free_rate, PROCESSED_DIR)
+
+
+    #covariance & Correlation matrix calculation and saving
+    numeric_returns = all_Asset_Returns.select_dtypes(include=['number'])
+    if numeric_returns.empty or numeric_returns.shape[1] < 1:
+        print("❌ No numeric return columns found; covariance not computed.")
+    else:
+        cov_matrix = numeric_returns.cov()
+        cov_matrix.to_excel(
+            PROCESSED_DIR / 'cov_matrix.xlsx',
+            index=True,
+            float_format='%.5f'
+        )
+        print("✅ Covariance matrix saved to PROCESSED_DIR")
+
+        corr_matrix = numeric_returns.corr()
+        corr_matrix.to_excel(
+            PROCESSED_DIR / 'corr_matrix.xlsx',
+            index=True,
+            float_format='%.5f'
+        )
+        print("✅ Correlation matrix saved to PROCESSED_DIR")
+
+    #more Correlation analysis
+    # ...
+
+    watchout_Assets=[
+        'usd',
+        'CWI',
+        'EWI',
+        'فولاد',
+        'فارس',
+        'تاپیکو',
+        'شستا',
+        'دعبید',
+        'شپدیس',
+        'همراه',
+        'حفارس',
+        'شکربن',
+        'کچاد',
+        'سصفها',
+    ]
+
+    #add share
+    investment_Result(watchout_Assets, all_Asset_Returns)
+
+    frontier_returns, frontier_risks, fig = efficient_frontier(watchout_Assets, risk_return_data, cov_matrix, PROCESSED_DIR)
 
 
 
-    '''
-    fetch_and_save_prices(stocks, RAW_DIR / "stock_prices")
+# ==============================
+# Calculating portfolio performance
+# ==============================
 
-    dollar = get_dollar_price()
-    market = get_market_index()
+# Function to calculate portfolio return and risk (standard deviation)
+'''
+def portfolio_performance(weights, expected_returns, cov_matrix):
+    port_return = np.sum(weights * expected_returns)
+    port_std_dev = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+    return port_return, port_std_dev
 
-    inputs = CAPMInputs(
-        start_date="2019-01-01",
-        end_date="2024-01-01",
-        risk_free_rate=0.25,
-        frequency="monthly",
-        market_col="close"
-    )
-
-    # load prices → compute returns → CAPM
-    ...
-
-    '''
+'''
 
 # ==============================
 # Core Selection Utilities

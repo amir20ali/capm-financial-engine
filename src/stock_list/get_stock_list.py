@@ -14,7 +14,7 @@ def get_stock_list(path):
 
     Tickers = DF1.index
 
-    pd.Series(Tickers, name="ticker").to_csv(path / "stock_list.csv", index=False, header=False, encoding="utf-8-sig")
+    pd.Series(Tickers, name="ticker").to_csv(path / "stock_list.csv", index=False, encoding="utf-8-sig")
 
     return Tickers
 
