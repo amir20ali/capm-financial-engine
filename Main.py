@@ -8,6 +8,7 @@ from src.calculations.calculate_Returns import calculate_Returns
 from src.calculations.investment_Result import investment_Result
 from src.calculations.risk_return_analysis import risk_return_analysis
 from src.calculations.efficient_frontier_calculation import efficient_frontier
+from src.calculations.capm_analysis import capm_analysis
 
 from datetime import date
 
@@ -190,6 +191,13 @@ def run_pipeline():
         'کچاد',
         'سصفها',
     ]
+
+    # ==============================
+    # CAPM: beta, alpha, Treynor, Security Market Line
+    # ==============================
+    market_index = 'CWI'   # market portfolio proxy (Total Index)
+    capm_results, capm_summary = capm_analysis(all_Asset_Returns, market_index, risk_free_stock,
+                                               frequency, PROCESSED_DIR)
 
     #add share
     investment_Result(watchout_Assets, all_Asset_Returns)
