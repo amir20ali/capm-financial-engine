@@ -72,7 +72,14 @@ def arrange_Assets_Prices(stock_list ,data_source,
     for stock_name in stock_names:
 
         # ---------- Load data ----------
+        # finpy-tse saves "<ticker>.csv"; pytse-client (adjust=True) saves "<ticker>-ت.csv"
         stock_path = data_source / f"{stock_name}.csv"
+        if not stock_path.exists():
+            stock_path = data_source / f"{stock_name}-ت.csv"
+        if not stock_path.exists():
+            print(f"   ⚠️  No price file for {stock_name} – skipped")
+            continue
+
         stock_data = pd.read_csv(stock_path)
         
         stock_data["date"] = pd.to_datetime(stock_data["date"])
@@ -152,3 +159,23 @@ def arrange_Assets_Prices(stock_list ,data_source,
 
         return all_Assets_Prices
 
+
+
+
+def drop_empty_assets(prices, min_obs=1):
+    """
+    Remove assets that have fewer than `min_obs` real prices in the analysis window.
+
+    prices : DataFrame whose first column is the period label (day / week / month)
+             and every other column is one asset.
+    """
+    label, data = prices.iloc[:, [0]], prices.iloc[:, 1:]
+    data = data.apply(pd.to_numeric, errors="coerce")
+
+    keep = data.count() >= min_obs
+    dropped = keep.index[~keep].tolist()
+    if dropped:
+        print(f"⚠️  Dropped {len(dropped)} assets with < {min_obs} prices: "
+              f"{dropped[:10]}{' ...' if len(dropped) > 10 else ''}")
+
+    return pd.concat([label, data.loc[:, keep]], axis=1)

@@ -3,7 +3,7 @@ from src.stock_list.get_stock_list import get_stock_list
 from src.extraction.finpy_tse.finpy_tse_Extraction import finpy_tse_Extraction
 from src.extraction.pytse_client.pytse_Client_Extraction import pytse_Client_Extraction
 from src.extraction.macroEconomy.macroEconomy_Extraction import get_macroeconomy_data
-from src.calculations.all_Assets_Prices import arrange_Assets_Prices
+from src.calculations.all_Assets_Prices import arrange_Assets_Prices, drop_empty_assets
 from src.calculations.calculate_Returns import calculate_Returns
 from src.calculations.investment_Result import investment_Result
 from src.calculations.risk_return_analysis import risk_return_analysis
@@ -139,12 +139,15 @@ def run_pipeline():
                                               start_date, end_date, frequency, 
                                               meconomy_Base, meconomy_path, meconomy_List,
                                               PROCESSED_DIR)
-    
+
+    # Remove assets with no (or too few) prices in the window
+    all_Assets_Prices = drop_empty_assets(all_Assets_Prices, min_obs=1)   # e.g. 6 monthly / 26 weekly
+
     all_Asset_Returns = calculate_Returns(all_Assets_Prices, PROCESSED_DIR)
 
     risk_free_stock = 'RF'
 
-    risk_return_data = risk_return_analysis(all_Asset_Returns, risk_free_stock, PROCESSED_DIR)
+    risk_return_data = risk_return_analysis(all_Asset_Returns, risk_free_stock, frequency, PROCESSED_DIR)
 
 
     #covariance & Correlation matrix calculation and saving
@@ -191,7 +194,7 @@ def run_pipeline():
     #add share
     investment_Result(watchout_Assets, all_Asset_Returns)
 
-    frontier_returns, frontier_risks, fig = efficient_frontier(watchout_Assets, risk_return_data, risk_free_stock, cov_matrix, PROCESSED_DIR)
+    frontier_returns, frontier_risks, fig = efficient_frontier(watchout_Assets, all_Asset_Returns, risk_free_stock, frequency, PROCESSED_DIR)
 
 
 

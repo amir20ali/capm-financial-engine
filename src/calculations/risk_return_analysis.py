@@ -1,61 +1,71 @@
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 
-def risk_return_analysis(all_Asset_Returns, risk_free_stock, PROCESSED_DIR):
+# Number of return periods in one year, used to annualise.
+# TSE has roughly 240 trading days a year.
+PERIODS_PER_YEAR = {"D": 240, "W": 52, "M": 12}
+
+
+def risk_return_analysis(all_Asset_Returns, risk_free_stock, frequency, PROCESSED_DIR):
+    """
+    Annualised return, risk and Sharpe ratio for every asset.
+
+    Return       = mean(r_t) * k                       (annualised arithmetic mean)
+    Risk         = std(r_t) * sqrt(k)                  (annualised volatility)
+    rf           = mean(rf_t) * k                      (annualised risk-free rate, all RF periods)
+    Sharpe Ratio = (Return - rf) / Risk
+    Total Return = prod(1 + r_t) - 1                   (over the whole window, for information)
+
+    k = number of periods per year (240 daily, 52 weekly, 12 monthly).
+    Every asset uses ALL of its own periods, and one risk-free rate is used for
+    every asset - the same numbers as on the efficient-frontier chart.
+    """
+    if frequency not in PERIODS_PER_YEAR:
+        raise ValueError("frequency must be one of: D, W, M")
+    k = PERIODS_PER_YEAR[frequency]
 
     df = all_Asset_Returns.copy()
 
-    # ستون زمان را حذف می‌کنیم
+    # Remove the period column and make sure everything is numeric
     date_col = df.columns[0]
-    returns = df.drop(columns=[date_col])
+    returns = df.drop(columns=[date_col]).apply(pd.to_numeric, errors="coerce")
 
-    # تبدیل به عدد
-    #returns = returns.apply(pd.to_numeric, errors='coerce').fillna(0)
+    if risk_free_stock not in returns.columns:
+        raise KeyError(f"'{risk_free_stock}' not found in the returns columns")
 
-    # ---- بازده کل دوره ----
-    total_return = (1 + returns).prod() - 1
+    # One annualised risk-free rate for the whole window
+    rf = returns[risk_free_stock].mean() * k
+    print(f"   Risk-free rate (annualised): {rf:.2%}")
 
-    if risk_free_stock in total_return.index:
-        risk_free_rate = total_return.loc[risk_free_stock]
-    else:
-        raise KeyError(f"'{risk_free_stock}' not found in total_return.index")
-    
-    # Calculate excess returns
-    excess_returns = total_return.subtract(risk_free_rate)
-
-    # ---- ریسک (انحراف معیار) ----
-    volatility = returns.std()
-
-    # اگر دیتای روزانه است → سالانه کنیم: از تعداد مشاهدات واقعی برای هر دارایی استفاده می‌کنیم
     counts = returns.count()
-    total_vol = volatility * (counts ** 0.5)
+    ann_return = returns.mean() * k
+    ann_risk = returns.std() * np.sqrt(k)
+    sharpe_ratio = (ann_return - rf) / ann_risk.replace(0, np.nan)
+    sharpe_ratio[risk_free_stock] = np.nan     # Sharpe of the risk-free asset itself is not meaningful
 
-    # ساخت DataFrame نهایی
-    # محافظت در برابر تقسیم بر صفر هنگام محاسبه Sharpe Ratio
-    sharpe_ratio = excess_returns / total_vol.replace(0, pd.NA)
+    # prod() of an empty column is 1 -> would show a fake 0% return, so mask it
+    total_return = ((1 + returns).prod() - 1).where(counts > 0)
 
     result = pd.DataFrame({
-        "Return": total_return,
-        "Risk": total_vol,
-        "Sharpe Ratio": sharpe_ratio,
-        "Counts": counts
+        "Return": ann_return,          # annualised
+        "Risk": ann_risk,              # annualised
+        "Sharpe Ratio": sharpe_ratio,  # annualised
+        "Total Return": total_return,  # whole window, not annualised
+        "Counts": counts,
     })
 
-    # Sort output by Sharpe Ratio descending
-    result = result.sort_values("Sharpe Ratio", ascending=False)
+    # Sort output by Sharpe Ratio descending (assets without data go to the end)
+    result = result.sort_values("Sharpe Ratio", ascending=False, na_position="last")
 
-    # ---- رسم نمودار ----
-    plot_risk_return(result)
-
-    # خروجی مرتب شده روی Sharpe Ratio
+    plot_risk_return(result.dropna(subset=["Return", "Risk"]))
 
     result.to_excel(
-        PROCESSED_DIR / 'Risk, Return and Sharpe Ratio.xlsx',
+        PROCESSED_DIR / "Risk, Return and Sharpe Ratio.xlsx",
         index=True,
-        float_format='%.5f'
+        float_format="%.5f",
     )
-
     print("✅ Risk/Return analysis saved to PROCESSED_DIR")
 
     return result
@@ -70,41 +80,30 @@ def plot_risk_return(result):
     fig.add_trace(go.Scatter(
         x=result["Risk"],
         y=result["Return"],
-        mode='markers+text',
-        text=result.index,   # نمایش نام سهام
+        mode="markers+text",
+        text=result.index,
         textposition="top center",
         marker=dict(
             size=14,
-            color=result["Sharpe Ratio"],   # رنگ بر اساس Sharpe Ratio
-            colorscale="RdYlGn",            # سبز خوب، قرمز بد
+            color=result["Sharpe Ratio"],
+            colorscale="RdYlGn",
             colorbar=dict(title="Sharpe Ratio"),
             showscale=True,
-            line=dict(width=1, color='black')
-        )
+            line=dict(width=1, color="black"),
+        ),
     ))
 
     fig.update_layout(
         template="plotly_white",
         height=650,
         width=950,
-        title=dict(
-            text="Risk vs Return (Portfolio View)",
-            x=0.02
-        ),
-        xaxis=dict(
-            title="Risk (Volatility)",
-            tickformat=".0%",
-            showgrid=True,
-            gridcolor="rgba(200,200,200,0.3)"
-        ),
-        yaxis=dict(
-            title="Return",
-            tickformat=".0%", 
-            showgrid=True,
-            gridcolor="rgba(200,200,200,0.3)"
-        ),
+        title=dict(text="Risk vs Return (annualised)", x=0.02),
+        xaxis=dict(title="Annualised Risk (Volatility)", tickformat=".0%",
+                   showgrid=True, gridcolor="rgba(200,200,200,0.3)"),
+        yaxis=dict(title="Annualised Return", tickformat=".0%",
+                   showgrid=True, gridcolor="rgba(200,200,200,0.3)"),
         font=dict(size=14),
-        hovermode="closest"
+        hovermode="closest",
     )
 
     fig.show()
